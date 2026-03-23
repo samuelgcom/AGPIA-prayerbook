@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGPIA — The Prayer Book of the Seven Canonical Hours | አጊፔያ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #1A2F5A;
+    --gold: #8B6914;
+    --bg: #f4f0e8;
+    --sidebar-w: 270px;
+    --page-w: 900px;
+    --page-h: 1164px;
+  }
+
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    background: #2c2c2c;
+    color: #333;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    background: var(--navy);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    height: 52px;
+    flex-shrink: 0;
+    gap: 12px;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  #topbar h1 {
+    font-size: 14px;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #topbar h1 span { color: var(--gold); }
+  #menu-toggle {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  #menu-toggle:hover { background: rgba(255,255,255,0.1); }
+
+  /* ── PAGE COUNTER ── */
+  #page-counter {
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── MAIN AREA ── */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    width: var(--sidebar-w);
+    background: #1a1a2e;
+    color: #ddd;
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: transform 0.3s ease, width 0.3s ease;
+    z-index: 50;
+  }
+  #sidebar.hidden {
+    transform: translateX(calc(-1 * var(--sidebar-w)));
+    width: 0;
+  }
+  #sidebar h2 {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold);
+    padding: 18px 16px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .chapter-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    color: #ccc;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.4;
+    transition: all 0.15s;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .chapter-btn:hover {
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    border-left-color: var(--gold);
+  }
+  .chapter-btn.active {
+    background: rgba(139,105,20,0.15);
+    color: #fff;
+    border-left-color: var(--gold);
+    font-weight: bold;
+  }
+  .chapter-btn .ch-en { display: block; }
+  .chapter-btn .ch-am { display: block; font-size: 11px; color: #999; margin-top: 2px; }
+  .chapter-btn.active .ch-am { color: var(--gold); }
+  .chapter-btn .ch-pg { float: right; font-size: 10px; color: #666; margin-top: 1px; }
+
+  /* ── VIEWER ── */
+  #viewer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    background: #2c2c2c;
+  }
+
+  /* ── FLIP BOOK CONTAINER ── */
+  #flipbook-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    gap: 0;
+  }
+
+  #flipbook {
+    position: relative;
+    display: flex;
+    filter: drop-shadow(0 8px 32px rgba(0,0,0,0.6));
+  }
+
+  /* Each page panel */
+  .page-panel {
+    width: var(--book-panel-w, 450px);
+    height: var(--book-panel-h, 582px);
+    overflow: hidden;
+    background: #fff;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .page-panel img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    display: block;
+  }
+
+  /* Page spine shadow */
+  #page-left { border-right: 2px solid #ddd; box-shadow: inset -4px 0 12px rgba(0,0,0,0.08); }
+  #page-right { border-left: 2px solid #ddd; box-shadow: inset 4px 0 12px rgba(0,0,0,0.08); }
+
+  /* Blank/cover pages */
+  .page-panel.blank { background: #f9f6f0; }
+  .page-panel.blank::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      -45deg, transparent, transparent 20px,
+      rgba(0,0,0,0.01) 20px, rgba(0,0,0,0.01) 21px
+    );
+  }
+
+  /* ── FLIP ANIMATION ── */
+  #flip-anim {
+    position: absolute;
+    pointer-events: none;
+    z-index: 10;
+    transform-origin: left center;
+    display: none;
+  }
+  #flip-anim.flipping-forward {
+    display: block;
+    animation: flipForward 0.45s ease-in-out forwards;
+  }
+  #flip-anim.flipping-backward {
+    display: block;
+    transform-origin: right center;
+    animation: flipBackward 0.45s ease-in-out forwards;
+  }
+
+  @keyframes flipForward {
+    0%   { transform: perspective(2000px) rotateY(0deg);   opacity: 1; }
+    50%  { transform: perspective(2000px) rotateY(-90deg); opacity: 0.6; }
+    100% { transform: perspective(2000px) rotateY(-180deg); opacity: 0; }
+  }
+  @keyframes flipBackward {
+    0%   { transform: perspective(2000px) rotateY(0deg);   opacity: 1; }
+    50%  { transform: perspective(2000px) rotateY(90deg);  opacity: 0.6; }
+    100% { transform: perspective(2000px) rotateY(180deg); opacity: 0; }
+  }
+
+  /* ── NAV ARROWS ── */
+  .nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(26,47,90,0.8);
+    color: #fff;
+    border: none;
+    width: 44px;
+    height: 64px;
+    font-size: 22px;
+    cursor: pointer;
+    border-radius: 4px;
+    z-index: 20;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-arrow:hover { background: var(--navy); }
+  .nav-arrow:disabled { opacity: 0.2; cursor: default; }
+  #btn-prev { left: 8px; }
+  #btn-next { right: 8px; }
+
+  /* ── BOTTOM BAR ── */
+  #bottombar {
+    background: var(--navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 16px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  #page-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255,255,255,0.7);
+    font-size: 12px;
+  }
+  #page-input {
+    width: 48px;
+    text-align: center;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+  #page-input:focus { outline: none; border-color: var(--gold); }
+
+  /* ── ZOOM ── */
+  #zoom-controls { display: flex; gap: 6px; }
+  .zoom-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    width: 28px; height: 28px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .zoom-btn:hover { background: rgba(255,255,255,0.2); }
+
+  /* ── SINGLE PAGE MODE (mobile) ── */
+  @media (max-width: 768px) {
+    :root { --sidebar-w: 240px; }
+    #page-right { display: none; }
+    #page-left { border-right: none; }
+  }
+
+  /* Preloader */
+  #preloader {
+    position: fixed; inset: 0;
+    background: var(--navy);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999;
+    color: #fff;
+    gap: 16px;
+  }
+  #preloader h2 { font-size: 22px; color: var(--gold); }
+  #preloader p { font-size: 13px; color: rgba(255,255,255,0.6); }
+  #load-bar-wrap { width: 200px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; }
+  #load-bar { height: 100%; background: var(--gold); border-radius: 2px; width: 0%; transition: width 0.1s; }
+
+  /* Keyboard hint */
+  #kb-hint {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.5);
+    font-size: 11px; padding: 4px 10px; border-radius: 3px;
+    pointer-events: none; opacity: 1; transition: opacity 1s;
+  }
+  #kb-hint.fade { opacity: 0; }
+</style>
+</head>
+<body>
+
+<!-- Preloader -->
+<div id="preloader">
+  <h2>AGPIA · አጊፔያ</h2>
+  <p>The Prayer Book of the Seven Canonical Hours</p>
+  <div id="load-bar-wrap"><div id="load-bar"></div></div>
+  <p id="load-status">Loading pages...</p>
+</div>
+
+<!-- Top Bar -->
+<div id="topbar">
+  <button id="menu-toggle" title="Toggle chapter menu">☰</button>
+  <h1>AGPIA — The Prayer Book of the Seven Canonical Hours &nbsp;·&nbsp; <span>አጊፔያ — የሰባቱ ቀኖናዊ ሰዓታት የጸሎት መጽሐፍ</span></h1>
+  <span id="page-counter">Page 1 of 127</span>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <h2>Chapters · ምዕራፎች</h2>
+    <button class="chapter-btn active" data-page="1">
+      <span class="ch-pg">1</span>
+      <span class="ch-en">Foreword & Introductory Prayer</span>
+      <span class="ch-am">መቅድምና የመክፈቻ ጸሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="6">
+      <span class="ch-pg">6</span>
+      <span class="ch-en">The Prayer of the First Hour</span>
+      <span class="ch-am">የመጀመሪያው ሰዓት ጸሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="27">
+      <span class="ch-pg">27</span>
+      <span class="ch-en">The Prayer of the Third Hour</span>
+      <span class="ch-am">የሦስተኛው ሰዓት ጸሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="42">
+      <span class="ch-pg">42</span>
+      <span class="ch-en">The Prayer of the Sixth Hour</span>
+      <span class="ch-am">የስድስተኛው ሰዓት ጸሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="57">
+      <span class="ch-pg">57</span>
+      <span class="ch-en">The Prayer of the Ninth Hour</span>
+      <span class="ch-am">የዘጠነኛው ሰዓት ጸሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="69">
+      <span class="ch-pg">69</span>
+      <span class="ch-en">The Prayer of the Eleventh Hour</span>
+      <span class="ch-am">የአስራ አንደኛ ሰዓት ጸሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="79">
+      <span class="ch-pg">79</span>
+      <span class="ch-en">The Prayer of the Twelfth Hour</span>
+      <span class="ch-am">የአስራ ሁለተኛ ሰዓት ጸሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="90">
+      <span class="ch-pg">90</span>
+      <span class="ch-en">The Prayer of the Veil</span>
+      <span class="ch-am">የመጋረጃ ጸሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="95">
+      <span class="ch-pg">95</span>
+      <span class="ch-en">Midnight Prayer — First Service</span>
+      <span class="ch-am">የእኩለ ሌሊት ጸሎት — የመጀመሪያ አገልግሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="110">
+      <span class="ch-pg">110</span>
+      <span class="ch-en">Midnight Prayer — Second Service</span>
+      <span class="ch-am">የእኩለ ሌሊት ጸሎት — ሁለተኛ አገልግሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="115">
+      <span class="ch-pg">115</span>
+      <span class="ch-en">Midnight Prayer — Third Service</span>
+      <span class="ch-am">የእኩለ ሌሊት ጸሎት — ሶስተኛ አገልግሎት</span>
+    </button>
+    <button class="chapter-btn" data-page="122">
+      <span class="ch-pg">122</span>
+      <span class="ch-en">Selected Prayers</span>
+      <span class="ch-am">የተመረጡ ጸሎቶች</span>
+    </button>
+  </div>
+
+  <!-- Viewer -->
+  <div id="viewer">
+    <div id="flipbook-wrap">
+      <button class="nav-arrow" id="btn-prev" title="Previous page (←)">&#8249;</button>
+
+      <div id="flipbook">
+        <div class="page-panel" id="page-left">
+          <img id="img-left" src="" alt="Page" loading="eager">
+        </div>
+        <div class="page-panel" id="page-right">
+          <img id="img-right" src="" alt="Page" loading="eager">
+        </div>
+        <div id="flip-anim">
+          <img id="flip-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
+        </div>
+      </div>
+
+      <button class="nav-arrow" id="btn-next" title="Next page (→)">&#8250;</button>
+    </div>
+    <div id="kb-hint">← → arrow keys to turn pages &nbsp;|&nbsp; Click chapter menu for sections</div>
+  </div>
+
+</div>
+
+<!-- Bottom Bar -->
+<div id="bottombar">
+  <div id="zoom-controls">
+    <button class="zoom-btn" id="btn-zoom-out" title="Zoom out">−</button>
+    <button class="zoom-btn" id="btn-zoom-in" title="Zoom in">+</button>
+    <button class="zoom-btn" id="btn-zoom-fit" title="Fit to screen" style="width:auto;padding:0 8px;font-size:11px;">Fit</button>
+  </div>
+  <div id="page-input-wrap">
+    Go to page:
+    <input type="number" id="page-input" min="1" max="127" value="1">
+    <span>/ 127</span>
+  </div>
+</div>
+
+<script>
+const TOTAL = 127;
+const PAGE_W = 900;
+const PAGE_H = 1164;
+
+// Chapter boundaries (page number → chapter name)
+const CHAPTERS = [
+  { page: 1,   en: 'Foreword & Introductory Prayer' },
+  { page: 6,   en: 'The Prayer of the First Hour' },
+  { page: 27,  en: 'The Prayer of the Third Hour' },
+  { page: 42,  en: 'The Prayer of the Sixth Hour' },
+  { page: 57,  en: 'The Prayer of the Ninth Hour' },
+  { page: 69,  en: 'The Prayer of the Eleventh Hour' },
+  { page: 79,  en: 'The Prayer of the Twelfth Hour' },
+  { page: 90,  en: 'The Prayer of the Veil' },
+  { page: 95,  en: 'Midnight Prayer — First Service' },
+  { page: 110, en: 'Midnight Prayer — Second Service' },
+  { page: 115, en: 'Midnight Prayer — Third Service' },
+  { page: 122, en: 'Selected Prayers' },
+];
+
+// State
+let currentPage = 1;       // 1-based, always the left page (odd)
+let zoom = 1.0;
+let isAnimating = false;
+let sidebarVisible = true;
+
+// DOM refs
+const imgLeft     = document.getElementById('img-left');
+const imgRight    = document.getElementById('img-right');
+const flipAnim    = document.getElementById('flip-anim');
+const flipImg     = document.getElementById('flip-img');
+const flipbook    = document.getElementById('flipbook');
+const pageLeft    = document.getElementById('page-left');
+const pageRight   = document.getElementById('page-right');
+const btnPrev     = document.getElementById('btn-prev');
+const btnNext     = document.getElementById('btn-next');
+const pageCounter = document.getElementById('page-counter');
+const pageInput   = document.getElementById('page-input');
+const sidebar     = document.getElementById('sidebar');
+const preloader   = document.getElementById('preloader');
+const loadBar     = document.getElementById('load-bar');
+const loadStatus  = document.getElementById('load-status');
+const kbHint      = document.getElementById('kb-hint');
+
+function pageSrc(n) {
+  if (n < 1 || n > TOTAL) return null;
+  return `page-${String(n).padStart(3,'0')}.jpg`;
+}
+
+function resizeBook() {
+  const viewer   = document.getElementById('viewer');
+  const vw       = viewer.clientWidth  - 100; // leave room for arrows
+  const vh       = viewer.clientHeight - 20;
+  const isMobile = window.innerWidth <= 768;
+  const cols     = isMobile ? 1 : 2;
+  const ratio    = PAGE_H / PAGE_W;
+  const panelW   = Math.min(PAGE_W, (vw / cols)) * zoom;
+  const panelH   = panelW * ratio;
+  const finalH   = Math.min(panelH, vh * zoom);
+  const finalW   = finalH / ratio;
+
+  document.querySelectorAll('.page-panel').forEach(p => {
+    p.style.width  = finalW + 'px';
+    p.style.height = finalH + 'px';
+  });
+  flipAnim.style.width  = finalW + 'px';
+  flipAnim.style.height = finalH + 'px';
+}
+
+function updateUI() {
+  // Left page = currentPage, right page = currentPage + 1
+  const left  = currentPage;
+  const right = currentPage + 1;
+
+  imgLeft.src  = pageSrc(left)  || '';
+  imgRight.src = pageSrc(right) || '';
+
+  pageLeft.classList.toggle('blank', !pageSrc(left));
+  pageRight.classList.toggle('blank', !pageSrc(right));
+
+  // Show/hide right panel on last page
+  pageRight.style.visibility = right > TOTAL ? 'hidden' : '';
+
+  btnPrev.disabled = currentPage <= 1;
+  btnNext.disabled = currentPage >= TOTAL;
+  pageCounter.textContent = `Pages ${left}–${Math.min(right, TOTAL)} of ${TOTAL}`;
+  pageInput.value = left;
+
+  // Update active chapter
+  let activeChapter = 0;
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    if (left >= CHAPTERS[i].page) activeChapter = i;
+  }
+  document.querySelectorAll('.chapter-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i === activeChapter);
+  });
+
+  // Scroll active chapter into view
+  const activeBtn = document.querySelector('.chapter-btn.active');
+  if (activeBtn) activeBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function goToPage(n, animate = true) {
+  // Normalize to odd number (left page of spread)
+  n = Math.max(1, Math.min(TOTAL, n));
+  if (n % 2 === 0) n = Math.max(1, n - 1);
+  if (n === currentPage) return;
+
+  const forward = n > currentPage;
+
+  if (!animate || isAnimating) {
+    currentPage = n;
+    updateUI();
+    return;
+  }
+
+  isAnimating = true;
+  // Setup flip animation
+  flipAnim.style.left = forward ? '50%' : '0';
+  flipImg.src = forward ? pageSrc(currentPage + 1) || '' : pageSrc(currentPage) || '';
+  flipAnim.className = '';
+  flipAnim.style.display = 'block';
+
+  // Trigger animation next frame
+  requestAnimationFrame(() => {
+    flipAnim.classList.add(forward ? 'flipping-forward' : 'flipping-backward');
+    setTimeout(() => {
+      currentPage = n;
+      updateUI();
+      flipAnim.style.display = 'none';
+      flipAnim.className = '';
+      isAnimating = false;
+    }, 450);
+  });
+}
+
+function nextSpread() { goToPage(currentPage + 2); }
+function prevSpread() { goToPage(currentPage - 2); }
+
+// Preload images
+function preloadAll() {
+  let loaded = 0;
+  const images = [];
+  for (let i = 1; i <= TOTAL; i++) {
+    const img = new Image();
+    img.onload = img.onerror = () => {
+      loaded++;
+      const pct = Math.round(loaded / TOTAL * 100);
+      loadBar.style.width = pct + '%';
+      loadStatus.textContent = `Loading page ${loaded} of ${TOTAL}…`;
+      if (loaded >= TOTAL) {
+        setTimeout(() => {
+          preloader.style.opacity = '0';
+          preloader.style.transition = 'opacity 0.4s';
+          setTimeout(() => preloader.style.display = 'none', 400);
+        }, 200);
+      }
+    };
+    img.src = pageSrc(i);
+    images.push(img);
+  }
+}
+
+// Event listeners
+btnPrev.addEventListener('click', prevSpread);
+btnNext.addEventListener('click', nextSpread);
+
+document.getElementById('menu-toggle').addEventListener('click', () => {
+  sidebarVisible = !sidebarVisible;
+  sidebar.classList.toggle('hidden', !sidebarVisible);
+  setTimeout(resizeBook, 310);
+});
+
+document.querySelectorAll('.chapter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pg = parseInt(btn.dataset.page);
+    goToPage(pg, false);
+  });
+});
+
+pageInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    goToPage(parseInt(pageInput.value) || 1, false);
+    pageInput.blur();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.target === pageInput) return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nextSpread(); }
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.preventDefault(); prevSpread(); }
+});
+
+// Click on book halves
+pageLeft.addEventListener('click',  () => { if (!isAnimating) prevSpread(); });
+pageRight.addEventListener('click', () => { if (!isAnimating) nextSpread(); });
+
+// Touch swipe
+let touchStartX = 0;
+document.getElementById('flipbook').addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+}, { passive: true });
+document.getElementById('flipbook').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 40) dx < 0 ? nextSpread() : prevSpread();
+}, { passive: true });
+
+// Zoom
+document.getElementById('btn-zoom-in').addEventListener('click',  () => { zoom = Math.min(2.0, zoom + 0.15); resizeBook(); });
+document.getElementById('btn-zoom-out').addEventListener('click', () => { zoom = Math.max(0.4, zoom - 0.15); resizeBook(); });
+document.getElementById('btn-zoom-fit').addEventListener('click', () => { zoom = 1.0; resizeBook(); });
+
+// Init
+window.addEventListener('resize', resizeBook);
+resizeBook();
+updateUI();
+preloadAll();
+
+// Fade keyboard hint
+setTimeout(() => kbHint.classList.add('fade'), 4000);
+</script>
+</body>
+</html>
